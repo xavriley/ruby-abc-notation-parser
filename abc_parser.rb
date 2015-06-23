@@ -39,9 +39,6 @@ class AbcParser < Parslet::Parser
   rule(:nth_repeat) { ((str("[1") | str("[2") | str("|1") | str(":|2"))).as(:nth_repeat) }
   rule(:barline) { (str("||") | str("[|") | str("|]") | str(":|") | str("|:") | str("::") | str("|")).as(:barline) }
 
-  rule(:begin_slur) { str("(") }
-  rule(:end_slur) { str(")") }
-
   rule(:field_part) { str("P:") >> part >> end_of_line }
   rule(:field_words) { str("W:") >> text >> end_of_line }
 
@@ -59,8 +56,22 @@ class AbcParser < Parslet::Parser
   rule(:tuplet_element) { tuplet_spec >> note_element.repeat(1) }
 
   rule(:line_ender) { comment | linefeed | line_break | no_line_break }
-  rule(:element) { nth_repeat | barline | note_element | tuplet_element | begin_slur | end_slur | space | user_defined }
-  rule(:abc_line) { (element.repeat >> line_ender).as(:line) | tex_command | mid_tune_field }
+  rule(:element) { note_element | tuplet_element | slur | space | user_defined }
+  rule(:bar) { (element.repeat >> (nth_repeat | barline)).as(:bar) }
+
+  rule(:begin_slur) { str("(") }
+  rule(:end_slur) { str(")") }
+
+  rule(:slur) {
+    begin_slur >>
+    (
+      (str('\\') >> element) |
+      (end_slur.absent? >> element)
+    ).repeat.as(:slur) >>
+    end_slur
+  }
+
+  rule(:abc_line) { (bar.repeat >> line_ender).as(:line) | tex_command | mid_tune_field }
   rule(:abc_music) { abc_line.repeat >> linefeed.maybe }
 
   ###########################################
@@ -145,7 +156,7 @@ M:6/8
 L:1/8
 R:jig
 K:G
-GFG BAB | gfg gab | GFG BAB | d2A AFD |
+GFG BAB | (gfg gab) | GFG BAB | d2A AFD |
 GFG BAB | gfg gab | age edB | dBA AFD :| dBA ABd |:
 efe edB | dBA ABd | efe edB | gdB ABd |
 efe edB | d2d def | gfe edB |1 dBA ABd :|2 dBA AFD |]

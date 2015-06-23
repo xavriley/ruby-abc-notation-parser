@@ -4,7 +4,16 @@ Uses [Parslet](http://kschiess.github.io/parslet/) to understand [ABC notation](
 
 Based on the BNF for abc 1.6 found at [http://web.archive.org/web/20080309023424/http://www.norbeck.nu/abc/abcbnf.htm](http://web.archive.org/web/20080309023424/http://www.norbeck.nu/abc/abcbnf.htm)
 
-Doesn't quite work yet but it will parse the most basic ABC files
+Doesn't fully work yet but it will parse the most basic ABC files
+
+### Todos
+
+- [ ] Fix slurs across barlines
+- [ ] Fix ties and tuplets to group notes
+- [ ] Figure out default octave info
+- [ ] Add default length to notes based on header
+- [ ] Tests!
+- [ ] Figure out a useable output format
 
 ```ruby
 pp AbcParser.new.parse("X:1
@@ -13,10 +22,10 @@ M:6/8
 L:1/8
 R:jig
 K:G
-GFG BAB | gfg gab | GFG BAB | d2A AFD |
-GFG BAB | gfg gab | age edB | dBA AFD |
+GFG BAB | (gfg gab) | GFG BAB | d2A AFD |
+GFG BAB | gfg gab | age edB | dBA AFD :| dBA ABd |:
 efe edB | dBA ABd | efe edB | gdB ABd |
-efe edB | d2d def | gfe edB | dBA ABd | dBA AFD |
+efe edB | d2d def | gfe edB |1 dBA ABd :|2 dBA AFD |]
 ")
 
 # outputs
@@ -25,131 +34,152 @@ efe edB | d2d def | gfe edB | dBA ABd | dBA AFD |
     :field_title=>{:title=>"The Legacy Jig"@6},
     :field_key=>{:key=>"G"@41}},
    {:line=>
-     [{:note=>{:note_pitch=>"G"@43, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@44, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"G"@45, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@47, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@48, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@49, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@51},
-      {:note=>{:note_pitch=>"g"@53, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@54, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"g"@55, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"g"@57, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"a"@58, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"b"@59, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@61},
-      {:note=>{:note_pitch=>"G"@63, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@64, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"G"@65, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@67, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@68, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@69, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@71},
-      {:note=>{:note_pitch=>"d"@73, :note_length=>"2"@74, :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@75, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@77, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@78, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"D"@79, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@81}]},
+     [{:bar=>
+        [{:note=>{:note_pitch=>"G"@43, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@44, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"G"@45, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@47, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@48, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@49, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@51}]},
+      {:bar=>
+        [{:slur=>
+           [{:note=>{:note_pitch=>"g"@54, :note_length=>"", :tie_begin=>nil}},
+            {:note=>{:note_pitch=>"f"@55, :note_length=>"", :tie_begin=>nil}},
+            {:note=>{:note_pitch=>"g"@56, :note_length=>"", :tie_begin=>nil}},
+            {:note=>{:note_pitch=>"g"@58, :note_length=>"", :tie_begin=>nil}},
+            {:note=>{:note_pitch=>"a"@59, :note_length=>"", :tie_begin=>nil}},
+            {:note=>
+              {:note_pitch=>"b"@60, :note_length=>"", :tie_begin=>nil}}]},
+         {:barline=>"|"@63}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"G"@65, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@66, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"G"@67, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@69, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@70, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@71, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@73}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@75, :note_length=>"2"@76, :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@77, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@79, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@80, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"D"@81, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@83}]}]},
    {:line=>
-     [{:note=>{:note_pitch=>"G"@83, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@84, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"G"@85, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@87, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@88, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@89, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@91},
-      {:note=>{:note_pitch=>"g"@93, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@94, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"g"@95, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"g"@97, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"a"@98, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"b"@99, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@101},
-      {:note=>{:note_pitch=>"a"@103, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"g"@104, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@105, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@107, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@108, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@109, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@111},
-      {:note=>{:note_pitch=>"d"@113, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@114, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@115, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@117, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@118, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"D"@119, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>":|"@121},
-      {:note=>{:note_pitch=>"d"@124, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@125, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@126, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@128, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@129, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@130, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|:"@132}]},
+     [{:bar=>
+        [{:note=>{:note_pitch=>"G"@85, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@86, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"G"@87, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@89, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@90, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@91, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@93}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"g"@95, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@96, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"g"@97, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"g"@99, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"a"@100, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"b"@101, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@103}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"a"@105, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"g"@106, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@107, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@109, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@110, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@111, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@113}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@115, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@116, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@117, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@119, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@120, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"D"@121, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>":|"@123}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@126, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@127, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@128, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@130, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@131, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@132, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|:"@134}]}]},
    {:line=>
-     [{:note=>{:note_pitch=>"e"@135, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@136, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@137, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@139, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@140, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@141, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@143},
-      {:note=>{:note_pitch=>"d"@145, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@146, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@147, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@149, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@150, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@151, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@153},
-      {:note=>{:note_pitch=>"e"@155, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@156, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@157, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@159, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@160, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@161, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@163},
-      {:note=>{:note_pitch=>"g"@165, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@166, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@167, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@169, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@170, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@171, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@173}]},
+     [{:bar=>
+        [{:note=>{:note_pitch=>"e"@137, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@138, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@139, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@141, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@142, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@143, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@145}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@147, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@148, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@149, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@151, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@152, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@153, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@155}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"e"@157, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@158, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@159, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@161, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@162, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@163, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@165}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"g"@167, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@168, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@169, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@171, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@172, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@173, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@175}]}]},
    {:line=>
-     [{:note=>{:note_pitch=>"e"@175, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@176, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@177, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@179, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@180, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@181, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@183},
-      {:note=>{:note_pitch=>"d"@185, :note_length=>"2"@186, :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@187, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@189, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@190, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@191, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|"@193},
-      {:note=>{:note_pitch=>"g"@195, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"f"@196, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@197, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"e"@199, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@200, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@201, :note_length=>"", :tie_begin=>nil}},
-      {:nth_repeat=>"|1"@203},
-      {:note=>{:note_pitch=>"d"@206, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@207, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@208, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@210, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@211, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"d"@212, :note_length=>"", :tie_begin=>nil}},
-      {:nth_repeat=>":|2"@214},
-      {:note=>{:note_pitch=>"d"@218, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"B"@219, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@220, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"A"@222, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"F"@223, :note_length=>"", :tie_begin=>nil}},
-      {:note=>{:note_pitch=>"D"@224, :note_length=>"", :tie_begin=>nil}},
-      {:barline=>"|]"@226}]}]}
+     [{:bar=>
+        [{:note=>{:note_pitch=>"e"@177, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@178, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@179, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@181, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@182, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@183, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@185}]},
+      {:bar=>
+        [{:note=>
+           {:note_pitch=>"d"@187, :note_length=>"2"@188, :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@189, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@191, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@192, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@193, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|"@195}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"g"@197, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"f"@198, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@199, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"e"@201, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@202, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@203, :note_length=>"", :tie_begin=>nil}},
+         {:nth_repeat=>"|1"@205}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@208, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@209, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@210, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@212, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@213, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"d"@214, :note_length=>"", :tie_begin=>nil}},
+         {:nth_repeat=>":|2"@216}]},
+      {:bar=>
+        [{:note=>{:note_pitch=>"d"@220, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"B"@221, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@222, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"A"@224, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"F"@225, :note_length=>"", :tie_begin=>nil}},
+         {:note=>{:note_pitch=>"D"@226, :note_length=>"", :tie_begin=>nil}},
+         {:barline=>"|]"@228}]}]}]}
 ```
