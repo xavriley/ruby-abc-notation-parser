@@ -1,6 +1,6 @@
 # Ruby ABC Notation Parser
 
-Uses [Parselet](http://kschiess.github.io/parslet/) to understand [ABC notation](https://en.wikipedia.org/wiki/ABC_notation)
+Uses [Parslet](http://kschiess.github.io/parslet/) to understand [ABC notation](https://en.wikipedia.org/wiki/ABC_notation)
 
 Based on the BNF for abc 1.6 found at [http://web.archive.org/web/20080309023424/http://www.norbeck.nu/abc/abcbnf.htm](http://web.archive.org/web/20080309023424/http://www.norbeck.nu/abc/abcbnf.htm)
 
