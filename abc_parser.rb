@@ -12,10 +12,10 @@ class AbcParser < Parslet::Parser
   rule(:no_line_break) { str("\\") >> linefeed }
   rule(:line_break) { str("!") >> linefeed }
   rule(:comment) { str("%") >> text >> (linefeed | line_break | no_line_break) }
-  rule(:basenote) { match("[A-Ga-g]").repeat(1) }
+  rule(:basenote) { match("[A-Ga-g]") }
   rule(:accidental) { str("^") | str("^^") | str("_") | str("__") | str("=") }
 
-  rule(:end_of_line) { (str(" ") | match("\t")).repeat.maybe >> (str("%") | text).maybe >> linefeed }
+  rule(:end_of_line) { (str(" ") | match("\t")).repeat.maybe >> (str("%") >> text).maybe >> linefeed }
   rule(:part) { str("A") | str("B") | str("C") | str("D") | str("E") | str("F") | str("G") | str("H") | str("I") | str("J") | str("K") | str("L") | str("M") | str("N") | str("O") | str("P") | str("Q") | str("R") | str("S") | str("T") | str("U") | str("V") | str("X") | str("Y") | str("Z") }
   rule(:part_spec) { (part | ( str("(") >> part_spec.repeat(1) >> str(")") ) ) >> digit.repeat }
   rule(:parts) { part_spec.repeat(1) }
@@ -26,17 +26,18 @@ class AbcParser < Parslet::Parser
   rule(:tie) { str("_") }
   rule(:broken_rhythm) { str("<").repeat(1) | str(">").repeat(1) }
   rule(:rest) { str("z") }
-  rule(:note_length) { digit.maybe >> (str("|") >> digit.maybe).maybe }
+  rule(:note_length) { digit.maybe }
   rule(:octave) { str("'").repeat | str(",").repeat }
   rule(:pitch) { accidental.maybe >> basenote >> octave.maybe }
   rule(:note_or_rest) { pitch | rest }
-  rule(:note) { note_or_rest >> note_length.maybe >> tie.maybe }
+  rule(:note) { (note_or_rest.as(:note_pitch) >> note_length.maybe.as(:note_length) >> tie.maybe.as(:tie_begin)).as(:note) }
   rule(:multi_note) { str("[") >> note >> str("]") }
   rule(:grace_notes) { str("{") >> pitch >> str("}") }
   rule(:gracings) { str("~") | str(".") | str("v") | str("u") | str("J") | str("R") | str("L") | str("H") }
 
-  rule(:barline) { str("|") | str("||") | str("[|") | str("|]") | str(":|") | str("|:") | str("::") }
-  rule(:nth_repeat) { (str("[1") | str("[2") | str("|1") | str(":|2")) >> space }
+  # These are order dependent in Parslet - XR
+  rule(:nth_repeat) { ((str("[1") | str("[2") | str("|1") | str(":|2"))).as(:nth_repeat) }
+  rule(:barline) { (str("||") | str("[|") | str("|]") | str(":|") | str("|:") | str("::") | str("|")).as(:barline) }
 
   rule(:begin_slur) { str("(") }
   rule(:end_slur) { str(")") }
@@ -58,7 +59,7 @@ class AbcParser < Parslet::Parser
   rule(:tuplet_element) { tuplet_spec >> note_element.repeat(1) }
 
   rule(:line_ender) { comment | linefeed | line_break | no_line_break }
-  rule(:element) { note_element | tuplet_element | barline | nth_repeat | begin_slur | end_slur | space | user_defined }
+  rule(:element) { nth_repeat | barline | note_element | tuplet_element | begin_slur | end_slur | space | user_defined }
   rule(:abc_line) { (element.repeat >> line_ender).as(:line) | tex_command | mid_tune_field }
   rule(:abc_music) { abc_line.repeat >> linefeed.maybe }
 
@@ -145,69 +146,7 @@ L:1/8
 R:jig
 K:G
 GFG BAB | gfg gab | GFG BAB | d2A AFD |
-GFG BAB | gfg gab | age edB | dBA AFD |
+GFG BAB | gfg gab | age edB | dBA AFD :| dBA ABd |:
 efe edB | dBA ABd | efe edB | gdB ABd |
-efe edB | d2d def | gfe edB | dBA ABd | dBA AFD |
+efe edB | d2d def | gfe edB |1 dBA ABd :|2 dBA AFD |]
 ")
-
-# pp AbcParser.new.parse("X:1
-# T:The Legacy Jig
-# M:6/8
-# L:1/8
-# R:jig
-# K:G
-# ")
-
-# class CorporationParser < Parslet::Parser
-
-#   rule(:whitespace) { match('[\s\r\n]') | str(',') | str('-') | str('(') | str(')') | str(':') | str('\"') | str('/') | str('*') | str('=') | str('>') | str('+') | str('[') | str(']') | str('_') | str('$') }
-#   rule(:whitespace?) { whitespace.repeat }
-
-#   rule(:special) { (special_helper >> (whitespace? >> special_helper).repeat).as(:special) }
-#   rule(:special_helper) { aand | corporates | initials | number }
-
-#   # and is a Ruby keyword
-#   rule(:aand) { str("&") | str("and") }
-
-#   rule(:number) { (number_helper >> (whitespace? >> number_helper).repeat).as(:number) }
-#   rule(:number_helper) { (str('no.') | str('#')).maybe >> match('[0-9]').repeat(1)  }
-
-#   rule(:initials) { ( match("[a-z]") >> str(".") ).repeat(1).as(:initials) }
-
-#   rule(:corporates) { (llc | pllc | llp | lp | incorporated | corporation | limited | company | international | association | foreign).as(:corporates) }
-#   rule(:association) { str("association") | str("assn.") | str("associations") | str("association's") | str("associations'") }
-#   rule(:international) { str("international") }
-#   rule(:llc)  { str("llc") | str("lc") | str("lcc") | str("llc.") }
-#   rule(:pllc) { str("pllc") }
-#   rule(:llp)  { str("llp") | str("llp.") }
-#   rule(:lp) {   str("lp") | str("lp.") | str("l.p.") }
-#   # Order is dependent in the following. The full stop version needs to be matched first
-#   rule(:incorporated)  { str("incorporated") | str("inc.") | str("inc") }
-#   rule(:corporation) { str("corps") | str("corporations") | str("corporation") | str("corp") | str("corp.") }
-#   rule(:limited) { str("ltd") | str("ltd.") | str("ltd..") }
-#   rule(:company) { str("company") | str("companies") | str("co.") }
-#   rule(:foreign) { str("ltda.")  }
-
-#   rule(:simple_fka) { complex_fka.absent? >> formers }
-#   rule(:complex_fka) { formers >> whitespace? >> fka_verbs >> (whitespace? | str("as")).maybe }
-#   rule(:fka_verbs) { str("registered") | str("filed") | str("reported") | str("known") | str("know") | str("field") }
-#   rule(:formers) { str("formerly") | str("formelry") | str("formarly") | str("frmly") | str("frly") }
-
-#   rule(:aka) { str('aka') | str('a/k/a') | str('a.k.a.') | str('also known as') }
-#   rule(:fka) { str('fka') | str('f/k/a') | str('f.k.a.') | str('formerly known as') | simple_fka | complex_fka }
-
-#   rule(:splitters) { fka.as(:fka) | aka.as(:aka) }
-
-#   rule(:simple) { (special | splitters | formers | initials).absent? >> match("[a-z0-9&!']").repeat(1).as(:simple) >> str('.').maybe }
-
-#   rule(:token) { simple | special }
-
-#   rule(:name) { (whitespace? >> token >> (whitespace? >> token).repeat) }
-
-#   rule(:beings) { (name.as(:company) >> (whitespace? >> splitters).maybe.as(:splitters) >> ((whitespace? >> name).maybe).as(:company_alt) ).as(:beings) }
-
-#   root(:beings)
-
-# end
-
-# pp CorporationParser.new.parse("SkyTerra Communications, Inc., formerly Mobile Satellite Ventures".downcase.strip)
