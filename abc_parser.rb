@@ -1,3 +1,4 @@
+require 'json'
 require 'parslet'
 require 'pp'
 
@@ -27,8 +28,8 @@ class AbcParser < Parslet::Parser
   rule(:broken_rhythm) { str("<").repeat(1) | str(">").repeat(1) }
   rule(:rest) { str("z") }
   rule(:note_length) { digit.maybe }
-  rule(:octave) { str("'").repeat | str(",").repeat }
-  rule(:pitch) { accidental.maybe >> basenote >> octave.maybe }
+  rule(:octave) { match("[',]").repeat }
+  rule(:pitch) { accidental.maybe.as(:accidental) >> basenote.as(:basenote) >> octave.maybe.as(:octave) }
   rule(:note_or_rest) { pitch | rest }
   rule(:note) { (note_or_rest.as(:note_pitch) >> note_length.maybe.as(:note_length) >> tie.maybe.as(:tie_begin)).as(:note) }
   rule(:multi_note) { str("[") >> note >> str("]") }
@@ -115,13 +116,13 @@ class AbcParser < Parslet::Parser
   rule(:field_group) { str("G:") >> text >> end_of_line }
   rule(:field_history) { str("H:") >> (text >> end_of_line).repeat(1) }
   rule(:field_information) { str("I:") >> text >> end_of_line }
-  rule(:field_default_length) { str("L:") >> note_length_strict >> end_of_line }
-  rule(:field_meter) { str("M:") >> meter >> end_of_line }
+  rule(:field_default_length) { str("L:") >> note_length_strict.as(:default_note_length) >> end_of_line }
+  rule(:field_meter) { str("M:") >> meter.as(:meter) >> end_of_line }
   rule(:field_notes) { str("N:") >> text >> end_of_line }
   rule(:field_origin) { str("O:") >> text >> end_of_line }
   rule(:field_parts) { str("P:") >> parts >> end_of_line }
-  rule(:field_tempo) { str("Q:") >> tempo >> end_of_line }
-  rule(:field_rhythm) { str("R:") >> text >> end_of_line }
+  rule(:field_tempo) { str("Q:") >> tempo.as(:tempo) >> end_of_line }
+  rule(:field_rhythm) { str("R:") >> text.as(:rhythm) >> end_of_line }
   rule(:field_source) { str("S:") >> text >> end_of_line }
   rule(:field_transcrnotes) { str("Z:") >> text >> end_of_line }
   rule(:field_key) { str("K:") >> key.as(:key) >> end_of_line }
@@ -139,7 +140,7 @@ class AbcParser < Parslet::Parser
   # so those wishing to implement an abc parser should treat this
   # field as optional.
   rule(:abc_header) { field_number.maybe.as(:field_number) >> comment.repeat.maybe >> field_title.as(:field_title) >> other_fields.repeat >> field_key.as(:field_key) }
-  rule(:abc_tune) { abc_header >> abc_music }
+  rule(:abc_tune) { abc_header.as(:abc_header) >> abc_music.as(:abc_music) }
 
   rule(:field_file) { str("F:") >> text.as(:field_number) >> end_of_line }
   rule(:file_fields) { field_file | field_book | field_group | field_history | field_information | field_meter | field_origin | field_rhythm } 
@@ -150,7 +151,36 @@ class AbcParser < Parslet::Parser
 
 end
 
-pp AbcParser.new.parse("X:1
+class AbcTransformer < Parslet::Transform
+  # matches a subtree with these exact keys
+  rule(:accidental => simple(:acc),
+       :basenote => simple(:note),
+       :octave => simple(:oct)) {
+         sp_acc = case acc
+         when "^"
+           "s"
+         when "_"
+           "b"
+         when "="
+           ""
+         else
+           ""
+         end
+         pitch_class = "#{note.to_s.downcase}#{sp_acc}"
+
+         base_octave = (note.to_s[/[A-G]/] ? 4 : 5)
+         additional_octaves = oct.to_s.chars.map {|x| ((x == ",") ? -1 : ((x == "'") ? 1 : 0))}
+         additional_octaves.each {|o|
+           base_octave = base_octave + o
+         }
+
+         absolute_pitch = "#{pitch_class}#{base_octave}"
+
+         {:accidental => acc, :basenote => note, :octave => oct, :absolute_pitch => absolute_pitch}
+       }
+end
+
+tree = AbcParser.new.parse("X:1
 T:The Legacy Jig
 M:6/8
 L:1/8
@@ -161,3 +191,5 @@ GFG BAB | gfg gab | age edB | dBA AFD :| dBA ABd |:
 efe edB | dBA ABd | efe edB | gdB ABd |
 efe edB | d2d def | gfe edB |1 dBA ABd :|2 dBA AFD |]
 ")
+
+puts AbcTransformer.new.apply(tree).to_json

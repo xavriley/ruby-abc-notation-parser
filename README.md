@@ -10,7 +10,7 @@ Doesn't fully work yet but it will parse the most basic ABC files
 
 - [ ] Fix slurs across barlines
 - [ ] Fix ties and tuplets to group notes
-- [ ] Figure out default octave info
+- [x] Figure out default octave info
 - [ ] Add default length to notes based on header
 - [ ] Tests!
 - [ ] Figure out a useable output format
