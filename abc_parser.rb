@@ -4,13 +4,13 @@ require 'pp'
 
 class AbcParser < Parslet::Parser
   # "%" is not included here (on purpose)!
-  rule(:text_char) { match("[A-Za-z0-9\s\t]") | str('"') | str("!") | str("\#") | str("$") | str("&") | str("'") | str("(") | str(")") | str("*") | str("+") | str(",") | str("-") | str(".") | str("|") | str(":") | str(";") | str("<") | str("=") | str(">") | str("?") | str("@") | str("[") | str("\\") | str("]") | str("^") | str("_") | str('`') | str("{") | str("|") | str("}") | str("~") }
+  rule(:text_char) { match("[A-Za-z0-9\s\t]") | str('/') | str('"') | str("!") | str("\#") | str("$") | str("&") | str("'") | str("(") | str(")") | str("*") | str("+") | str(",") | str("-") | str(".") | str("|") | str(":") | str(";") | str("<") | str("=") | str(">") | str("?") | str("@") | str("[") | str("\\") | str("]") | str("^") | str("_") | str('`') | str("{") | str("|") | str("}") | str("~") }
   rule(:text) { text_char.repeat }
   rule(:digit) { match("[0-9]") }
   rule(:linefeed) { match("[\r\n]") }
   rule(:tex_command) { str("\\") >> text >> linefeed }
   rule(:space) { str(" ") | match("\t") }
-  rule(:no_line_break) { str("\\") >> linefeed }
+  rule(:no_line_break) { str('\\') >> (str("\r") | str("\n")) }
   rule(:line_break) { str("!") >> linefeed }
   rule(:comment) { str("%") >> text >> (linefeed | line_break | no_line_break) }
   rule(:basenote) { match("[A-Ga-g]") }
@@ -24,14 +24,15 @@ class AbcParser < Parslet::Parser
   ###########################################
   # abc_music
   ###########################################
-  rule(:tie) { str("_") }
+  rule(:tie) { str("_") | str("-") }
+  rule(:trill) { str("/") }
   rule(:broken_rhythm) { str("<").repeat(1) | str(">").repeat(1) }
   rule(:rest) { str("z") }
   rule(:note_length) { digit.maybe }
   rule(:octave) { match("[',]").repeat }
   rule(:pitch) { accidental.maybe.as(:accidental) >> basenote.as(:basenote) >> octave.maybe.as(:octave) }
   rule(:note_or_rest) { pitch | rest }
-  rule(:note) { (note_or_rest.as(:note_pitch) >> note_length.maybe.as(:note_length) >> tie.maybe.as(:tie_begin)).as(:note) }
+  rule(:note) { (note_or_rest.as(:note_pitch) >> note_length.maybe.as(:note_length) >> (tie.maybe.as(:tie_begin) | trill.maybe.as(:trill)) ).as(:note) }
   rule(:multi_note) { str("[") >> note >> str("]") }
   rule(:grace_notes) { str("{") >> pitch >> str("}") }
   rule(:gracings) { str("~") | str(".") | str("v") | str("u") | str("J") | str("R") | str("L") | str("H") }
@@ -128,7 +129,7 @@ class AbcParser < Parslet::Parser
   rule(:field_key) { str("K:") >> key.as(:key) >> end_of_line }
 
   # field-file and field-words may not be in header (?)
-  rule(:other_fields) { field_area | field_book | field_composer | field_discography | field_elemskip | field_group | field_history | field_information | field_default_length | field_meter | field_notes | field_origin | field_parts | field_tempo | field_rhythm | field_source | field_transcrnotes | comment }
+  rule(:other_fields) { file_fields | field_number.as(:field_number) | field_title | field_area | field_book | field_composer | field_discography | field_elemskip | field_group | field_history | field_information | field_default_length | field_meter | field_notes | field_origin | field_parts | field_tempo | field_rhythm | field_source | field_transcrnotes | comment }
   rule(:field_title) { str("T:") >> text.as(:title) >> end_of_line }
   rule(:field_number) { str("X:") >> digit.repeat.as(:number) >> end_of_line }
 
@@ -139,19 +140,28 @@ class AbcParser < Parslet::Parser
   # In practice, many tunes are e-mailed without field-number,
   # so those wishing to implement an abc parser should treat this
   # field as optional.
-  rule(:abc_header) { field_number.maybe.as(:field_number) >> comment.repeat.maybe >> field_title.as(:field_title) >> other_fields.repeat >> field_key.as(:field_key) }
+  rule(:abc_header) { other_fields.repeat >> field_key.as(:field_key) }
   rule(:abc_tune) { abc_header.as(:abc_header) >> abc_music.as(:abc_music) }
 
-  rule(:field_file) { str("F:") >> text.as(:field_number) >> end_of_line }
+  rule(:field_file) { str("F:") >> text.as(:field_file) >> end_of_line }
   rule(:file_fields) { field_file | field_book | field_group | field_history | field_information | field_meter | field_origin | field_rhythm } 
 
   rule(:abc_file) { (abc_tune | comment | linefeed | tex_command | file_fields).repeat.as(:abc_file) }
 
-  root(:abc_file)
-
+  root(:abc_music)
 end
 
 class AbcTransformer < Parslet::Transform
+  KEY_LOOKUP = {
+    :maj => [""]*7,
+    :min => ["", "", "", "", "", "", ""],
+  }
+
+  def initialize(opts = {})
+    @default_note_length = opts[:note_length]
+    @key = opts[:key]
+  end
+
   # matches a subtree with these exact keys
   rule(:accidental => simple(:acc),
        :basenote => simple(:note),
@@ -180,7 +190,7 @@ class AbcTransformer < Parslet::Transform
        }
 end
 
-tree = AbcParser.new.parse("X:1
+INPUT = "X:1
 T:The Legacy Jig
 M:6/8
 L:1/8
@@ -189,7 +199,49 @@ K:G
 GFG BAB | (gfg gab) | GFG BAB | d2A AFD |
 GFG BAB | gfg gab | age edB | dBA AFD :| dBA ABd |:
 efe edB | dBA ABd | efe edB | gdB ABd |
-efe edB | d2d def | gfe edB |1 dBA ABd :|2 dBA AFD |]
-")
+efe edB | d2z def | gfe edB |1 dBA ABd :|2 dBA AFD |]
+"
 
-puts AbcTransformer.new.apply(tree).to_json
+BACH_FULL = <<-BACH
+ef | g2fe ^d2ef | B2^c^d e2 =d=c |\
+  B2AG F2GA | BA GF E2ef |\
+  g2fe ^d2ef | B2^c^d e2=d=c | B2AG F2DG | G6::\
+  BG | d2Ac B2gd | e2Bd c2BA | ^G2AB c2BA | A4-A2dA |\
+  B2gd e2Bd | c2ae f2^ce | d2^cB ^A/B/A/B/A/B/A/B/ |\
+  B4-B2bf | ^g2fe a2e=g | f2ed g2d=f | e2ae f2^ce |\
+  ^d2B2-B4| eB c2dA B2| cG A2BF G2| FE ^D2EF G2| FE E4:|
+BACH
+
+BACH = <<-BACH
+ef | g2fe ^d2ef | B2^c^d e2 =d=c |\
+  B2AG F2GA | BA GF E2ef |\
+  ^d2B2-B4| eB c2dA B2| cG A2BF G2| FE ^D2EF G2| FE E4:|
+BACH
+
+SAILOR = <<-SAILOR
+X: 11
+T:Sweep's Hornpipe, The
+M:4/4
+L:1/8
+H:1837
+S:John Moore of Shropshire
+Z:vmp.John Adams
+K:G
+D2|G2 BG E2 cA | FGAF G2 Bd | dcAc cBGB | ABcA GFED | GABG ABcA |
+BcdB cdef | gfgd ecAF | G2G2G2 | Bc| dBdB g2 Bc| dedB G2 Bd | dcAc cBGB |
+ABcA GFED | GABG ABcA | BcdB cdef | gfgd ecAF | G2G2G2:|
+SAILOR
+
+#puts BACH
+parser = AbcParser.new
+tree = parser.parse(BACH_FULL)
+puts tree
+# parse header
+# get note_length, time_sig, key
+
+#lol at this code
+# note_length = parser.parse(INPUT)[:abc_file].first[:abc_header][1..-1].select {|x| x[:default_note_length] }.first.values.first.to_s
+# key = parser.parse(INPUT)[:abc_file].first[:abc_header][1..-1].select {|x| x[:field_key] }.first.values.first[:key].to_s
+# meter = parser.parse(INPUT)[:abc_file].first[:abc_header][1..-1].select {|x| x[:meter] }.first.values.first.to_s
+
+#puts AbcTransformer.new.apply(tree).to_json
